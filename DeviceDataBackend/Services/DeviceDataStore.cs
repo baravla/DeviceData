@@ -1,35 +1,37 @@
 ﻿using DeviceDataModels;
-using Microsoft.Extensions.Caching.Memory;
+using System.Collections.Concurrent;
 
 namespace DeviceDataBackend.Services {
     public class DeviceDataStore : IDeviceDataStore {
-        MemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
+        private readonly ConcurrentDictionary<string, DevicePacket> _store = new();
 
         public void AddDevicePacket(DevicePacket packet) {
             var key = $"{packet.Source}_{packet.Timestamp:O}";
-            _cache.Set(key, packet);
+            _store[key] = packet;
         }
-        
+
         public IEnumerable<DevicePacket> GetDevicePackets(
             Func<DevicePacket, bool> packetFilter,
             IEnumerable<Func<DeviceParameter, bool>>? parameterFilters = null) {
             var results = new List<DevicePacket>();
-            foreach (var key in _cache.Keys) {
-                if (_cache.TryGetValue(key, out var value) && value is DevicePacket packet && packetFilter(packet)) {
-                    bool match = true;
 
-                    if (parameterFilters != null) {
-                        foreach (var pf in parameterFilters) {
-                            if (!packet.Parameters.Any(pf)) {
-                                match = false; 
-                                break;
-                            }
+            foreach (var packet in _store.Values) {
+                if (!packetFilter(packet))
+                    continue;
+
+                bool match = true;
+
+                if (parameterFilters != null) {
+                    foreach (var pf in parameterFilters) {
+                        if (!packet.Parameters.Any(pf)) {
+                            match = false;
+                            break;
                         }
                     }
-
-                    if (match)
-                        results.Add(packet);
                 }
+
+                if (match)
+                    results.Add(packet);
             }
 
             return results;
