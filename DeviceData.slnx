@@ -2,4 +2,5 @@
   <Project Path="DeviceDataBackend/DeviceDataBackend.csproj" />
   <Project Path="DeviceDataFrontend/DeviceDataFrontend.csproj" />
   <Project Path="DeviceDataModels/DeviceDataModels.csproj" />
+  <Project Path="DeviceDataTests/DeviceDataTests.csproj" />
 </Solution>

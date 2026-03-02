@@ -1,5 +1,6 @@
 ﻿@page "/device-data"
 @using DeviceDataModels
+@using DeviceDataFrontend.Services
 @inject HttpClient Http
 
 <h2 class="mb-4">Device Data Management</h2>
@@ -193,15 +194,26 @@
     private async Task AddPacket() {
         addErrorMessage = null; // Сбрасываем предыдущее сообщение
         newPacket.Timestamp = timestampInput;
+        // Client-side validation
+        if (string.IsNullOrWhiteSpace(newPacket.PatientId)) {
+            addErrorMessage = "PatientId is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newPacket.Source)) {
+            addErrorMessage = "Source is required.";
+            return;
+        }
 
         try {
-            var response = await Http.PostAsJsonAsync("api/devicedata", newPacket);
+            var response = await Http.PostAsJsonAsync(ApiRoutes.DeviceData, newPacket);
 
             if (response.IsSuccessStatusCode) {
                 newPacket = new DevicePacket();
             }
             else {
-                addErrorMessage = $"Server returned error: {response.StatusCode}";
+                var text = await response.Content.ReadAsStringAsync();
+                addErrorMessage = $"Server returned error: {response.StatusCode} - {text}";
             }
         }
         catch (Exception ex) {
@@ -226,6 +238,11 @@
         searchErrorMessage = null; // Сбрасываем предыдущее сообщение
         results = null;
 
+        if (filterFrom.HasValue && filterTo.HasValue && filterFrom > filterTo) {
+            searchErrorMessage = "'From' must be less than or equal to 'To'.";
+            return;
+        }
+
         var query = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(filterPatientId))
@@ -240,7 +257,7 @@
         if (filterTo.HasValue)
             query.Add($"to={filterTo.Value:o}");
 
-        var url = "api/devicedata";
+        var url = ApiRoutes.DeviceData;
 
         if (query.Any())
             url += "?" + string.Join("&", query);

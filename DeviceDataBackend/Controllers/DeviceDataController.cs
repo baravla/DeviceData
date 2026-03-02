@@ -16,45 +16,77 @@ namespace DeviceDataBackend.Controllers {
 
         [HttpPost]
         public IActionResult Add([FromBody] DevicePacket packet) {
-            _cache.AddDevicePacket(packet);
-            return Ok();
+            try {
+                if (packet == null)
+                    return BadRequest("Packet payload is required.");
+
+                if (string.IsNullOrWhiteSpace(packet.PatientId))
+                    return BadRequest("PatientId is required.");
+
+                if (string.IsNullOrWhiteSpace(packet.Source))
+                    return BadRequest("Source is required.");
+
+                // Ensure timestamp is set - optional business rule
+                if (packet.Timestamp == default)
+                    packet.Timestamp = DateTime.UtcNow;
+
+                _cache.AddDevicePacket(packet);
+                return Ok();
+            }
+            catch (ArgumentException ex) {
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex) {
+                // Log exception here when a logger is available
+                return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred.");
+            }
         }
 
         [HttpGet]
         public IActionResult Get(
                 [FromQuery] string? patientId,
+                [FromQuery] string? source,
                 [FromQuery] DateTime? from,
                 [FromQuery] DateTime? to,
                 [FromQuery] string[]? parameterName,
                 [FromQuery] double[]? minValue,
                 [FromQuery] double[]? maxValue) 
         {
-            Func<DevicePacket, bool> packetFilter = p =>
-                (string.IsNullOrEmpty(patientId) || p.PatientId == patientId) &&
-                (!from.HasValue || p.Timestamp >= from.Value) &&
-                (!to.HasValue || p.Timestamp <= to.Value);
+            try {
+                if (from.HasValue && to.HasValue && from > to)
+                    return BadRequest("'from' must be less than or equal to 'to'.");
 
-            List<Func<DeviceParameter, bool>>? parameterFilters = null;
+                Func<DevicePacket, bool> packetFilter = p =>
+                    (string.IsNullOrEmpty(patientId) || p.PatientId == patientId) &&
+                    (string.IsNullOrEmpty(source) || p.Source == source) &&
+                    (!from.HasValue || p.Timestamp >= from.Value) &&
+                    (!to.HasValue || p.Timestamp <= to.Value);
 
-            if (parameterName != null && parameterName.Length > 0) {
-                parameterFilters = new List<Func<DeviceParameter, bool>>();
+                List<Func<DeviceParameter, bool>>? parameterFilters = null;
 
-                for (int i = 0; i < parameterName.Length; i++) {
-                    string name = parameterName[i];
-                    double? min = (minValue != null && i < minValue.Length) ? minValue[i] : (double?)null;
-                    double? max = (maxValue != null && i < maxValue.Length) ? maxValue[i] : (double?)null;
+                if (parameterName != null && parameterName.Length > 0) {
+                    parameterFilters = new List<Func<DeviceParameter, bool>>();
 
-                    parameterFilters.Add(param =>
-                        param.Name == name &&
-                        (!min.HasValue || param.Value >= min.Value) &&
-                        (!max.HasValue || param.Value <= max.Value)
-                    );
+                    for (int i = 0; i < parameterName.Length; i++) {
+                        string name = parameterName[i];
+                        double? min = (minValue != null && i < minValue.Length) ? minValue[i] : (double?)null;
+                        double? max = (maxValue != null && i < maxValue.Length) ? maxValue[i] : (double?)null;
+
+                        parameterFilters.Add(param =>
+                            param.Name == name &&
+                            (!min.HasValue || param.Value >= min.Value) &&
+                            (!max.HasValue || param.Value <= max.Value)
+                        );
+                    }
                 }
+
+                var results = _cache.GetDevicePackets(packetFilter, parameterFilters).ToList();
+                return Ok(results);
             }
-
-            var results = _cache.GetDevicePackets(packetFilter, parameterFilters).ToList();
-
-            return Ok(results);
+            catch (Exception ex) {
+                // Log exception when a logger is available
+                return StatusCode(StatusCodes.Status500InternalServerError, "An unexpected error occurred while processing the request.");
+            }
         }
     }
 }
