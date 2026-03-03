@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 namespace DeviceDataBackend.Services {
     public class DeviceDataStore : IDeviceDataStore {
         private readonly ConcurrentDictionary<string, DevicePacket> _store = new();
-        // Global sequence to ensure unique keys even when all packet fields collide
         private static long _globalSequence;
         public Task AddDevicePacketAsync(DevicePacket packet) {
             if (packet is null)
@@ -20,11 +19,10 @@ namespace DeviceDataBackend.Services {
             if (string.IsNullOrWhiteSpace(packet.Source))
                 throw new ArgumentException("Source must be provided", nameof(packet.Source));
 
-            // Ensure Parameters collection is initialized to avoid null refs elsewhere
+            // let's make it not null by default 
             packet.Parameters ??= new List<DeviceParameter>();
 
-            // Use a stable key including Source, PatientId, Timestamp (ISO) and a global sequence
-            // The sequence (Interlocked.Increment) guarantees uniqueness even if all other fields match.
+            // generate new unique key for the packet 
             var seq = Interlocked.Increment(ref _globalSequence);
             var key = $"{packet.Source}_{packet.PatientId}_{packet.Timestamp:O}_{seq}";
             _store[key] = packet;

@@ -30,7 +30,6 @@ namespace DeviceDataBackend.Controllers {
                 if (string.IsNullOrWhiteSpace(packet.Source))
                     return BadRequest("Source is required.");
 
-                // Ensure timestamp is set - optional business rule
                 if (packet.Timestamp == default)
                     packet.Timestamp = DateTime.UtcNow;
 
