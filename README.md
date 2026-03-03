@@ -23,7 +23,6 @@ Supports patient ID, source, timestamp, and measured parameters.
 3. Run both in parallel (Start button)
 The frontent should be visible in browser: `https://localhost:7273/device-data` 
 
-> Tip: The backend exposes a REST API; the frontend calls it via HTTPS.
 
 ---
 
