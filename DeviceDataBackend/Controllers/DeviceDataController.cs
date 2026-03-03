@@ -1,4 +1,8 @@
-﻿using DeviceDataBackend.Services;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using DeviceDataBackend.Services;
 using DeviceDataModels;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +19,7 @@ namespace DeviceDataBackend.Controllers {
         }
 
         [HttpPost]
-        public IActionResult Add([FromBody] DevicePacket packet) {
+        public async Task<IActionResult> Add([FromBody] DevicePacket packet) {
             try {
                 if (packet == null)
                     return BadRequest("Packet payload is required.");
@@ -30,7 +34,7 @@ namespace DeviceDataBackend.Controllers {
                 if (packet.Timestamp == default)
                     packet.Timestamp = DateTime.UtcNow;
 
-                _cache.AddDevicePacket(packet);
+                await _cache.AddDevicePacketAsync(packet);
                 return Ok();
             }
             catch (ArgumentException ex) {
@@ -43,7 +47,7 @@ namespace DeviceDataBackend.Controllers {
         }
 
         [HttpGet]
-        public IActionResult Get(
+        public async Task<IActionResult> Get(
                 [FromQuery] string? patientId,
                 [FromQuery] string? source,
                 [FromQuery] DateTime? from,
@@ -80,7 +84,7 @@ namespace DeviceDataBackend.Controllers {
                     }
                 }
 
-                var results = _cache.GetDevicePackets(packetFilter, parameterFilters).ToList();
+                var results = (await _cache.GetDevicePacketsAsync(packetFilter, parameterFilters)).ToList();
                 return Ok(results);
             }
             catch (Exception ex) {

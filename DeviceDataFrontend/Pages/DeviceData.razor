@@ -1,6 +1,6 @@
 ﻿@page "/device-data"
 @using DeviceDataModels
-@using DeviceDataFrontend.Services
+@using DeviceDataFrontend
 @inject HttpClient Http
 
 <h2 class="mb-4">Device Data Management</h2>
@@ -35,8 +35,13 @@
                 <h6>Add Parameter</h6>
 
                 <div class="row g-2 mb-2">
-                    <div class="col">
-                        <input placeholder="Name" @bind="newParamName" class="form-control" />
+                <div class="col">
+                        <select @bind="newParamName" class="form-select">
+                            @foreach (var opt in parameterOptions)
+                            {
+                                <option value="@opt">@opt</option>
+                            }
+                        </select>
                     </div>
                     <div class="col">
                         <input type="number" step="0.1" placeholder="Value" @bind="newParamValue" class="form-control" />
@@ -104,6 +109,35 @@
                         <label class="form-label">To</label>
                         <input type="datetime-local" @bind="filterTo" class="form-control" />
                     </div>
+                    
+                    <div class="col-12">
+                        <label class="form-label">Parameter filters (optional)</label>
+                        <div class="list-group mb-2">
+                            @for (int i = 0; i < filterParameterFilters.Count; i++) {
+                                var idx = i;
+                                <div class="row g-2 mb-2 align-items-center">
+                                    <div class="col-md-5">
+                                        <select class="form-select" @bind="filterParameterFilters[idx].Name">
+                                            @foreach (var opt in parameterOptions) {
+                                                <option value="@opt">@opt</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="number" step="0.1" class="form-control" placeholder="Min" @bind="filterParameterFilters[idx].Min" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="number" step="0.1" class="form-control" placeholder="Max" @bind="filterParameterFilters[idx].Max" />
+                                    </div>
+                                    <div class="col-md-1">
+                                        <button type="button" class="btn btn-outline-danger btn-sm" @onclick="(() => RemoveParameterFilter(idx))">&times;</button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="AddParameterFilter">+ Add parameter filter</button>
+                    </div>
                 </div>
 
                 <button class="btn btn-primary w-100" @onclick="LoadData">
@@ -167,13 +201,16 @@
 </div>
 
 @code {
+
+    private const string pathApiRoute = "api/DeviceData";
     // =====================
     // ADD SECTION
     // =====================
     private DevicePacket newPacket = new();
     private DateTime timestampInput = DateTime.Now;
 
-    private string? newParamName;
+    private string[] parameterOptions = new[] { "Heart Rate", "Respiratory Rate", "Temperature (F)" };
+    private string newParamName = "Heart Rate";
     private double newParamValue;
 
     // Сообщение об ошибке при добавлении
@@ -186,9 +223,20 @@
                 Value = newParamValue
             });
 
-            newParamName = string.Empty;
+            newParamName = parameterOptions.Length > 0 ? parameterOptions[0] : string.Empty;
             newParamValue = 0;
         }
+    }
+
+    private void AddParameterFilter()
+    {
+        filterParameterFilters.Add(new ParameterFilterModel { Name = parameterOptions.Length > 0 ? parameterOptions[0] : string.Empty });
+    }
+
+    private void RemoveParameterFilter(int index)
+    {
+        if (index >= 0 && index < filterParameterFilters.Count)
+            filterParameterFilters.RemoveAt(index);
     }
 
     private async Task AddPacket() {
@@ -206,7 +254,7 @@
         }
 
         try {
-            var response = await Http.PostAsJsonAsync(ApiRoutes.DeviceData, newPacket);
+            var response = await Http.PostAsJsonAsync(pathApiRoute, newPacket);
 
             if (response.IsSuccessStatusCode) {
                 newPacket = new DevicePacket();
@@ -228,6 +276,14 @@
     private string? filterSource;
     private DateTime? filterFrom;
     private DateTime? filterTo;
+    private class ParameterFilterModel {
+        public string Name { get; set; } = string.Empty;
+        // Keep as string to avoid Blazor number parsing errors while typing.
+        public string? Min { get; set; }
+        public string? Max { get; set; }
+    }
+
+    private List<ParameterFilterModel> filterParameterFilters = new();
 
     private List<DevicePacket>? results;
 
@@ -243,13 +299,34 @@
             return;
         }
 
+        // Validate parameter filters (min <= max) and parse values lazily
+        for (int i = 0; i < filterParameterFilters.Count; i++) {
+            var pf = filterParameterFilters[i];
+            if (!string.IsNullOrWhiteSpace(pf.Name)) {
+                if (!string.IsNullOrWhiteSpace(pf.Min) && !string.IsNullOrWhiteSpace(pf.Max)) {
+                    if (!double.TryParse(pf.Min, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var minVal)) {
+                        searchErrorMessage = $"Parameter filter #{i + 1}: Min is not a valid number.";
+                        return;
+                    }
+                    if (!double.TryParse(pf.Max, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var maxVal)) {
+                        searchErrorMessage = $"Parameter filter #{i + 1}: Max is not a valid number.";
+                        return;
+                    }
+                    if (minVal > maxVal) {
+                        searchErrorMessage = $"Parameter filter #{i + 1}: Min must be <= Max.";
+                        return;
+                    }
+                }
+            }
+        }
+
         var query = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(filterPatientId))
-            query.Add($"patientId={filterPatientId}");
+            query.Add($"patientId={Uri.EscapeDataString(filterPatientId)}");
 
         if (!string.IsNullOrWhiteSpace(filterSource))
-            query.Add($"source={filterSource}");
+            query.Add($"source={Uri.EscapeDataString(filterSource)}");
 
         if (filterFrom.HasValue)
             query.Add($"from={filterFrom.Value:o}");
@@ -257,7 +334,22 @@
         if (filterTo.HasValue)
             query.Add($"to={filterTo.Value:o}");
 
-        var url = ApiRoutes.DeviceData;
+        var url = pathApiRoute;
+
+        // Add parameter filters (can be empty). Parse Min/Max as needed using invariant culture.
+        foreach (var pf in filterParameterFilters)
+        {
+            if (!string.IsNullOrWhiteSpace(pf.Name))
+            {
+                query.Add($"parameterName={Uri.EscapeDataString(pf.Name)}");
+
+                if (!string.IsNullOrWhiteSpace(pf.Min) && double.TryParse(pf.Min, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var minVal))
+                    query.Add($"minValue={minVal.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+
+                if (!string.IsNullOrWhiteSpace(pf.Max) && double.TryParse(pf.Max, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var maxVal))
+                    query.Add($"maxValue={maxVal.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            }
+        }
 
         if (query.Any())
             url += "?" + string.Join("&", query);

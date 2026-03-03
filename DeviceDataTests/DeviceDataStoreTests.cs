@@ -17,7 +17,7 @@ namespace DeviceDataTests
         }
 
         [Fact]
-        public void AddDevicePacket_ShouldStorePacket()
+        public async System.Threading.Tasks.Task AddDevicePacket_ShouldStorePacket()
         {
             var packet = new DevicePacket
             {
@@ -27,45 +27,45 @@ namespace DeviceDataTests
                 Parameters = new List<DeviceParameter> { new DeviceParameter { Name = "HR", Value = 80 } }
             };
 
-            _store.AddDevicePacket(packet);
+            await _store.AddDevicePacketAsync(packet);
 
-            var all = _store.GetDevicePackets().ToList();
+            var all = (await _store.GetDevicePacketsAsync()).ToList();
             Assert.Contains(packet, all);
         }
 
         [Fact]
-        public void GetDevicePackets_ShouldFilterByPatientId()
+        public async System.Threading.Tasks.Task GetDevicePackets_ShouldFilterByPatientId()
         {
             var now = DateTime.UtcNow;
             var packet1 = new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = now };
             var packet2 = new DevicePacket { PatientId = "P2", Source = "D1", Timestamp = now };
 
-            _store.AddDevicePacket(packet1);
-            _store.AddDevicePacket(packet2);
+            await _store.AddDevicePacketAsync(packet1);
+            await _store.AddDevicePacketAsync(packet2);
 
-            var filtered = _store.GetDevicePackets(patientId: "P1").ToList();
+            var filtered = (await _store.GetDevicePacketsAsync(patientId: "P1")).ToList();
             Assert.Single(filtered);
             Assert.Equal("P1", filtered.First().PatientId);
         }
 
         [Fact]
-        public void GetDevicePackets_ShouldFilterByTimeRange()
+        public async System.Threading.Tasks.Task GetDevicePackets_ShouldFilterByTimeRange()
         {
             var t1 = DateTime.UtcNow.AddMinutes(-10);
             var t2 = DateTime.UtcNow.AddMinutes(-5);
             var t3 = DateTime.UtcNow;
 
-            _store.AddDevicePacket(new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = t1 });
-            _store.AddDevicePacket(new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = t2 });
-            _store.AddDevicePacket(new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = t3 });
+            await _store.AddDevicePacketAsync(new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = t1 });
+            await _store.AddDevicePacketAsync(new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = t2 });
+            await _store.AddDevicePacketAsync(new DevicePacket { PatientId = "P1", Source = "D1", Timestamp = t3 });
 
-            var filtered = _store.GetDevicePackets(filterFrom: t1.AddMinutes(1), filterTo: t3.AddMinutes(-1)).ToList();
+            var filtered = (await _store.GetDevicePacketsAsync(filterFrom: t1.AddMinutes(1), filterTo: t3.AddMinutes(-1))).ToList();
             Assert.Single(filtered);
             Assert.Equal(t2, filtered.First().Timestamp);
         }
 
         [Fact]
-        public void GetDevicePackets_ShouldFilterByParameters()
+        public async System.Threading.Tasks.Task GetDevicePackets_ShouldFilterByParameters()
         {
             var now = DateTime.UtcNow;
             var packet1 = new DevicePacket
@@ -84,12 +84,12 @@ namespace DeviceDataTests
                 Parameters = new List<DeviceParameter> { new DeviceParameter { Name = "HR", Value = 100 } }
             };
 
-            _store.AddDevicePacket(packet1);
-            _store.AddDevicePacket(packet2);
+            await _store.AddDevicePacketAsync(packet1);
+            await _store.AddDevicePacketAsync(packet2);
 
-            var filtered = _store.GetDevicePackets(
+            var filtered = (await _store.GetDevicePacketsAsync(
                 parameterName: "HR", minValue: 90, maxValue: 110
-            ).ToList();
+            )).ToList();
 
             Assert.Single(filtered);
             Assert.Equal(100d, filtered.First().Parameters.First().Value);

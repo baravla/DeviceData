@@ -1,11 +1,16 @@
 ﻿using DeviceDataModels;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DeviceDataBackend.Services {
     public class DeviceDataStore : IDeviceDataStore {
         private readonly ConcurrentDictionary<string, DevicePacket> _store = new();
-
-        public void AddDevicePacket(DevicePacket packet) {
+        // Global sequence to ensure unique keys even when all packet fields collide
+        private static long _globalSequence;
+        public Task AddDevicePacketAsync(DevicePacket packet) {
             if (packet is null)
                 throw new ArgumentNullException(nameof(packet));
 
@@ -18,12 +23,16 @@ namespace DeviceDataBackend.Services {
             // Ensure Parameters collection is initialized to avoid null refs elsewhere
             packet.Parameters ??= new List<DeviceParameter>();
 
-            // Use an immutable snapshot key using timestamp ISO format
-            var key = $"{packet.Source}_{packet.Timestamp:O}";
+            // Use a stable key including Source, PatientId, Timestamp (ISO) and a global sequence
+            // The sequence (Interlocked.Increment) guarantees uniqueness even if all other fields match.
+            var seq = Interlocked.Increment(ref _globalSequence);
+            var key = $"{packet.Source}_{packet.PatientId}_{packet.Timestamp:O}_{seq}";
             _store[key] = packet;
+
+            return Task.CompletedTask;
         }
 
-        public IEnumerable<DevicePacket> GetDevicePackets(
+        public Task<IEnumerable<DevicePacket>> GetDevicePacketsAsync(
             Func<DevicePacket, bool> packetFilter,
             IEnumerable<Func<DeviceParameter, bool>>? parameterFilters = null) {
             if (packetFilter is null)
@@ -53,14 +62,14 @@ namespace DeviceDataBackend.Services {
                     results.Add(packet);
             }
 
-            return results;
+            return Task.FromResult<IEnumerable<DevicePacket>>(results);
         }
 
         // Convenience overloads used by tests and simple callers
-        public IEnumerable<DevicePacket> GetDevicePackets()
-            => GetDevicePackets(p => true, null);
+        public Task<IEnumerable<DevicePacket>> GetDevicePacketsAsync()
+            => GetDevicePacketsAsync(p => true, null);
 
-        public IEnumerable<DevicePacket> GetDevicePackets(
+        public Task<IEnumerable<DevicePacket>> GetDevicePacketsAsync(
             string? patientId = null,
             string? source = null,
             DateTime? filterFrom = null,
@@ -86,7 +95,8 @@ namespace DeviceDataBackend.Services {
                 };
             }
 
-            return GetDevicePackets(packetFilter, parameterFilters);
+            return GetDevicePacketsAsync(packetFilter, parameterFilters);
         }
-    }
+}
+
 }
