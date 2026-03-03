@@ -40,7 +40,7 @@ namespace DeviceDataBackend.Services {
 
             var results = new List<DevicePacket>();
 
-            // Take a snapshot of values to avoid issues if collection is modified concurrently
+            // snaphot to avoid concurrent modification issues
             var snapshot = _store.Values.ToArray();
 
             foreach (var packet in snapshot) {
@@ -65,7 +65,7 @@ namespace DeviceDataBackend.Services {
             return Task.FromResult<IEnumerable<DevicePacket>>(results);
         }
 
-        // Convenience overloads used by tests and simple callers
+        // For tests 
         public Task<IEnumerable<DevicePacket>> GetDevicePacketsAsync()
             => GetDevicePacketsAsync(p => true, null);
 
