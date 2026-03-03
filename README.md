@@ -5,7 +5,7 @@ Simple C# backend for storing and querying medical device packets, with a Blazor
 Supports patient ID, source, timestamp, and measured parameters.
 
 
-> Developed and tested in **Visual Studio 2026** with **.NET 10K**
+> Developed and tested in **Visual Studio 2026** with **.NET 10**
 ---
 
 ## Features
