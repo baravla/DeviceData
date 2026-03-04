@@ -4,6 +4,8 @@
 Simple C# backend for storing and querying medical device packets, with a Blazor WebAssembly frontend.  
 Supports patient ID, source, timestamp, and measured parameters.
 
+
+> Developed and tested in **Visual Studio 2026** with **.NET 10**
 ---
 
 ## Features
@@ -21,7 +23,6 @@ Supports patient ID, source, timestamp, and measured parameters.
 3. Run both in parallel (Start button)
 The frontent should be visible in browser: `https://localhost:7273/device-data` 
 
-> Tip: The backend exposes a REST API; the frontend calls it via HTTPS.
 
 ---
 
