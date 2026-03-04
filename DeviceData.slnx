@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
   <Project Path="DeviceDataBackend/DeviceDataBackend.csproj" />
   <Project Path="DeviceDataFrontend/DeviceDataFrontend.csproj" />
   <Project Path="DeviceDataModels/DeviceDataModels.csproj" />
